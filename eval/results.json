@@ -1,0 +1,82 @@
+{
+  "timestamp": "2026-11-22T14:51:13.442071+00:00",
+  "sample_count": 2,
+  "retrieval_ablation": {
+    "vector_only": {
+      "precision@k": 0.2,
+      "recall@k": 1.0,
+      "mrr": 0.75,
+      "ndcg@k": 0.8155
+    },
+    "hybrid": {
+      "precision@k": 0.2,
+      "recall@k": 1.0,
+      "mrr": 0.75,
+      "ndcg@k": 0.8155
+    }
+  },
+  "factual_consistency": {
+    "citation_coverage": 0.8333,
+    "quote_verification_rate": 0.0,
+    "faithfulness_score": 0.0,
+    "supported_pct": 0.0,
+    "partial_pct": 0.0,
+    "unsupported_pct": 100.0
+  },
+  "detailed_results": [
+    {
+      "id": "q1",
+      "topic": "Transformers",
+      "question": "What is the foundational architecture of the Transformer model and how does self-attention replace recurrence?",
+      "retrieval": {
+        "vector_only": {
+          "precision@k": 0.2,
+          "recall@k": 1.0,
+          "mrr": 1.0,
+          "ndcg@k": 1.0
+        },
+        "hybrid": {
+          "precision@k": 0.2,
+          "recall@k": 1.0,
+          "mrr": 1.0,
+          "ndcg@k": 1.0
+        }
+      },
+      "factual_consistency": {
+        "citation_coverage": 0.8333,
+        "quote_verification_rate": 0.0,
+        "faithfulness_score": 0.0,
+        "supported_pct": 0.0,
+        "partial_pct": 0.0,
+        "unsupported_pct": 100.0
+      }
+    },
+    {
+      "id": "q2",
+      "topic": "Retrieval-Augmented Generation",
+      "question": "How does Retrieval-Augmented Generation (RAG) combine parametric pre-trained language models with non-parametric dense vector retrieval?",
+      "retrieval": {
+        "vector_only": {
+          "precision@k": 0.2,
+          "recall@k": 1.0,
+          "mrr": 0.5,
+          "ndcg@k": 0.6309
+        },
+        "hybrid": {
+          "precision@k": 0.2,
+          "recall@k": 1.0,
+          "mrr": 0.5,
+          "ndcg@k": 0.6309
+        }
+      },
+      "factual_consistency": {
+        "citation_coverage": 0.8333,
+        "quote_verification_rate": 0.0,
+        "faithfulness_score": 0.0,
+        "supported_pct": 0.0,
+        "partial_pct": 0.0,
+        "unsupported_pct": 100.0
+      }
+    }
+  ]
+}
