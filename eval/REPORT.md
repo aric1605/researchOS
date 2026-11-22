@@ -1,7 +1,7 @@
 # ResearchOS Rigorous System Evaluation Report
 
-Generated: 2026-11-22T14:51:13.442071+00:00  
-Evaluated on **2 curated academic research queries** across foundational ML topics (Transformers, RAG, LoRA, FlashAttention, CoT, MoE, Diffusion, DPO).
+Generated: 2026-11-22T14:59:08.381294+00:00  
+Evaluated on **8 curated academic research queries** across foundational ML topics (Transformers, RAG, LoRA, FlashAttention, CoT, MoE, Diffusion, DPO).
 
 ---
 
@@ -11,10 +11,10 @@ Comparison of candidate document retrieval against known ground-truth arXiv rele
 
 | Metric | Vector-Only | Hybrid (Dense + BM25 RRF) | Absolute Delta | Relative Gain |
 | :--- | :---: | :---: | :---: | :---: |
-| **Precision@5** | `0.2000` | **`0.2000`** | `+0.0000` | `+0.0%` |
-| **Recall@5** | `1.0000` | **`1.0000`** | `+0.0000` | `+0.0%` |
-| **MRR** | `0.7500` | **`0.7500`** | `+0.0000` | `+0.0%` |
-| **nDCG@5** | `0.8155` | **`0.8155`** | `+0.0000` | `+0.0%` |
+| **Precision@5** | `0.1750` | **`0.2000`** | `+0.0250` | `+14.3%` |
+| **Recall@5** | `0.8750` | **`1.0000`** | `+0.1250` | `+14.3%` |
+| **MRR** | `0.5000` | **`0.4938`** | `+-0.0062` | `+-1.2%` |
+| **nDCG@5** | `0.5982` | **`0.6215`** | `+0.0233` | `+3.9%` |
 
 ### Key Retrieval Observations:
 - **Lexical Precision with BM25**: Pure vector cosine search occasionally retrieves conceptually related but keyword-mismatched papers. Hybrid fusion using Reciprocal Rank Fusion ($k=60$) guarantees that exact architectural terms (e.g., "FlashAttention", "LoRA", "Switch Transformer") receive heavy keyword reinforcement.

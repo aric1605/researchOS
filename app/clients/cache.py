@@ -12,8 +12,11 @@ logger = logging.getLogger("researchos.cache")
 
 
 class DiskCache:
-    def __init__(self, namespace: str = "general"):
-        self.cache_dir = Path(settings.CACHE_DIR) / namespace
+    def __init__(self, namespace: str = "general", cache_dir: Optional[Path] = None):
+        if cache_dir is not None:
+            self.cache_dir = Path(cache_dir)
+        else:
+            self.cache_dir = Path(settings.CACHE_DIR) / namespace
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _compute_key(self, payload: Any) -> str:

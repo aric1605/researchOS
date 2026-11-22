@@ -253,11 +253,13 @@ class LLMClient:
         self.budget_tracker.record_call(is_cached=False)
 
         json_str = _extract_json_block(raw_resp)
+        parse_error_msg = ""
         try:
             parsed = schema.model_validate_json(json_str)
             llm_cache.set(cache_key, parsed.model_dump())
             return parsed
         except (ValidationError, json.JSONDecodeError) as parse_err:
+            parse_error_msg = str(parse_err)
             logger.warning(
                 f"Initial structured output parsing failed ({parse_err}). Attempting 1 automatic repair retry..."
             )
@@ -265,7 +267,7 @@ class LLMClient:
         # Automatic repair retry (exactly one retry as per prompt specs)
         repair_prompt = (
             f"The previous output was invalid JSON or did not match the required schema.\n"
-            f"Error details: {parse_err}\n"
+            f"Error details: {parse_error_msg}\n"
             f"Previous output:\n{raw_resp}\n\n"
             f"Please output strictly valid JSON conforming to the schema without commentary."
         )

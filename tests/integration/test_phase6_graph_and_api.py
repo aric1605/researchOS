@@ -123,3 +123,25 @@ async def test_api_run_retrieval_and_events():
         await asyncio.sleep(0.5)
 
     assert run_data["status"] in ("completed", "pending", "running")
+
+
+def test_queue_full_429(monkeypatch):
+    """Verifies that when the background queue is full, new jobs are rejected with 429."""
+    monkeypatch.setattr(settings, "ACCESS_CODE", None)
+    client = TestClient(app)
+
+    # Fill queue up to maxsize
+    while not routes_module._job_queue.full():
+        routes_module._job_queue.put_nowait({"run_id": "dummy", "question": "test", "depth": "quick", "max_papers": 1})
+
+    res = client.post("/api/research", json={"question": "Another job when queue is completely full"})
+    assert res.status_code == 429
+    assert "queue is full" in res.json()["detail"].lower()
+
+    # Clean up dummy jobs
+    while not routes_module._job_queue.empty():
+        try:
+            routes_module._job_queue.get_nowait()
+            routes_module._job_queue.task_done()
+        except Exception:
+            break

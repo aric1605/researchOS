@@ -4,6 +4,7 @@ import pytest
 from pydantic import BaseModel
 from typing import List
 
+from app.config import settings
 from app.clients.cache import DiskCache
 from app.clients.llm import CallBudgetTracker, BudgetExceededError, LLMClient, _extract_json_block
 from app.clients.embeddings import get_embedding, get_embeddings, EMBEDDING_DIM
@@ -35,7 +36,7 @@ def test_budget_tracker_enforcement():
 
 
 def test_disk_cache(tmp_path):
-    cache = DiskCache(namespace="test_cache")
+    cache = DiskCache(namespace="test_cache", cache_dir=tmp_path)
     key_payload = {"prompt": "hello world", "model": "test-model"}
     val = {"response": "Hi there!"}
 
@@ -85,3 +86,30 @@ async def test_llm_client_mock_structured():
     assert isinstance(result.name, str)
     assert isinstance(result.score, float)
     assert isinstance(result.tags, list)
+
+
+@pytest.mark.asyncio
+async def test_llm_json_repair_retry(monkeypatch):
+    """Verifies that if the initial response is malformed, LLMClient executes exactly 1 repair retry."""
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test_key")
+    client = LLMClient(force_mock=False)
+    # Monkeypatch execute_with_retry to fail once with bad json, then return valid json
+    call_count = 0
+
+    async def mock_execute(prompt, system_instruction, temperature=0.2):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return "This is malformed, not valid JSON at all!"
+        return '{"name": "Repaired Object", "score": 9.9, "tags": ["repaired"]}'
+
+    monkeypatch.setattr(client, "_execute_with_retry", mock_execute)
+
+    import uuid
+    result = await client.generate_structured(
+        prompt=f"Test repair {uuid.uuid4()}",
+        schema=SampleItem,
+    )
+    assert call_count == 2  # exactly 1 initial + 1 repair retry
+    assert result.name == "Repaired Object"
+    assert result.score == 9.9
