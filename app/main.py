@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pathlib import Path
 
 from app import __version__
@@ -19,6 +20,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("researchos")
+
+static_dir = Path(__file__).resolve().parent.parent / "static"
 
 
 @asynccontextmanager
@@ -56,6 +59,15 @@ app.add_middleware(
 app.include_router(api_router)
 
 
+@app.get("/", tags=["UI"])
+async def serve_index():
+    """Serves the single-page application frontend."""
+    index_file = static_dir / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return {"message": "ResearchOS API running. Static frontend not found."}
+
+
 @app.get("/health", tags=["System"])
 async def health_check():
     """Health check endpoint checking PostgreSQL and Qdrant connectivity."""
@@ -78,6 +90,5 @@ async def health_check():
 
 
 # Static files mount
-static_dir = Path(__file__).resolve().parent.parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")

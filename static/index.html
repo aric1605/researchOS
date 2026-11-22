@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ResearchOS — Autonomous Multi-Agent Scientific Research</title>
+  <meta name="description" content="Multi-agent scientific research system coordinating retrieval, claim extraction, critical comparison, and cited synthesis with rigorous evaluation.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+</head>
+<body>
+  <!-- Server Wakeup Alert -->
+  <div id="wakeup-banner" class="banner hidden" role="status" aria-live="polite">
+    <span class="spinner-small"></span> Waking up Render server instance (free tier cold-start may take ~30s)...
+  </div>
+
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="logo-group">
+        <div class="logo-icon">🔬</div>
+        <div class="logo-text">
+          <h1>ResearchOS</h1>
+          <span class="badge badge-accent">Multi-Agent System</span>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <button id="nav-home" class="nav-btn active" aria-current="page">Research</button>
+        <button id="nav-eval" class="nav-btn">System Evaluation</button>
+        <button id="nav-history" class="nav-btn">Recent Runs</button>
+        <button id="theme-toggle" class="theme-toggle" aria-label="Toggle Dark/Light Mode">
+          <span class="theme-icon">🌙</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- View 1: Home / Research Setup -->
+    <section id="view-home" class="view active">
+      <div class="hero">
+        <h2 class="hero-title">Autonomous Scientific Literature Synthesis</h2>
+        <p class="hero-subtitle">
+          Supervisor-coordinated agents retrieve arXiv papers, extract atomic claims with verbatim quote verification, conduct critical comparisons, and draft fully cited summaries.
+        </p>
+      </div>
+
+      <div class="card card-query">
+        <form id="research-form">
+          <div class="form-group">
+            <label for="question-input" class="label-heading">Research Question</label>
+            <textarea
+              id="question-input"
+              rows="3"
+              placeholder="e.g., How do FlashAttention and standard self-attention compare in terms of memory hierarchy optimization and exact attention computation?"
+              required
+            ></textarea>
+          </div>
+
+          <div class="chips-container" aria-label="Example Questions">
+            <span class="chips-label">Try an example:</span>
+            <button type="button" class="chip" data-q="What is the foundational architecture of the Transformer model and how does self-attention replace recurrence?">Transformers vs RNNs</button>
+            <button type="button" class="chip" data-q="How does FlashAttention optimize GPU memory hierarchy (HBM vs SRAM) to achieve fast exact attention?">FlashAttention IO-Awareness</button>
+            <button type="button" class="chip" data-q="How does Low-Rank Adaptation (LoRA) freeze pre-trained model weights and inject trainable rank decomposition matrices?">LoRA PEFT</button>
+            <button type="button" class="chip" data-q="How does Direct Preference Optimization (DPO) optimize language models from human preferences without a reward model?">DPO Alignment</button>
+          </div>
+
+          <div class="form-row">
+            <div class="depth-toggle-group">
+              <span class="label-heading">Depth</span>
+              <div class="segmented-control" role="radiogroup">
+                <button type="button" class="seg-btn" data-depth="quick" role="radio" aria-checked="false">Quick (Abstracts)</button>
+                <button type="button" class="seg-btn active" data-depth="standard" role="radio" aria-checked="true">Standard (PDFs + Hybrid)</button>
+              </div>
+            </div>
+
+            <div class="access-code-group" id="access-code-wrapper">
+              <label for="access-code-input" class="label-heading">Access Code <span class="text-muted">(if required)</span></label>
+              <input type="password" id="access-code-input" placeholder="Passcode" autocomplete="off">
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <div class="rate-status" id="rate-status-text">
+              <span class="dot dot-success"></span> Runs remaining this hour: <strong id="runs-left">5</strong>
+            </div>
+            <button type="submit" id="run-btn" class="btn btn-primary">
+              <span class="btn-text">Execute Research Run</span>
+              <span class="spinner hidden"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div id="home-error" class="alert alert-error hidden" role="alert"></div>
+    </section>
+
+    <!-- View 2: Live Run Timeline & Trace -->
+    <section id="view-live" class="view hidden">
+      <div class="card card-live">
+        <div class="live-header">
+          <div>
+            <div class="live-status-pill">
+              <span class="pulsing-dot"></span>
+              <span id="live-status-text">Supervisor coordinating agents...</span>
+            </div>
+            <h3 id="live-question-title" class="live-title">Research in progress</h3>
+          </div>
+          <div class="live-meta">
+            <span class="timer-badge">Elapsed: <strong id="live-timer">0.0s</strong></span>
+          </div>
+        </div>
+
+        <!-- Vertical Agent Timeline -->
+        <div class="timeline" aria-live="polite">
+          <div class="timeline-step" id="step-supervisor">
+            <div class="step-marker"><span class="step-icon">1</span></div>
+            <div class="step-content">
+              <div class="step-head">
+                <h4>Supervisor Agent</h4>
+                <span class="step-badge" id="badge-supervisor">Pending</span>
+              </div>
+              <p class="step-desc" id="desc-supervisor">Decomposing research query into structured sub-questions...</p>
+              <div class="step-details hidden" id="details-supervisor"></div>
+            </div>
+          </div>
+
+          <div class="timeline-step" id="step-retrieval">
+            <div class="step-marker"><span class="step-icon">2</span></div>
+            <div class="step-content">
+              <div class="step-head">
+                <h4>Retrieval Agent</h4>
+                <span class="step-badge" id="badge-retrieval">Pending</span>
+              </div>
+              <p class="step-desc" id="desc-retrieval">Searching arXiv, parsing PDF text, and running hybrid retrieval (Vector + BM25)...</p>
+              <div class="step-details hidden" id="details-retrieval"></div>
+            </div>
+          </div>
+
+          <div class="timeline-step" id="step-extraction">
+            <div class="step-marker"><span class="step-icon">3</span></div>
+            <div class="step-content">
+              <div class="step-head">
+                <h4>Claim & Evidence Extraction Agent</h4>
+                <span class="step-badge" id="badge-extraction">Pending</span>
+              </div>
+              <p class="step-desc" id="desc-extraction">Extracting atomic claims and verifying verbatim quotes against chunk text...</p>
+              <div class="step-details hidden" id="details-extraction"></div>
+            </div>
+          </div>
+
+          <div class="timeline-step" id="step-comparison">
+            <div class="step-marker"><span class="step-icon">4</span></div>
+            <div class="step-content">
+              <div class="step-head">
+                <h4>Critical Comparison Agent</h4>
+                <span class="step-badge" id="badge-comparison">Pending</span>
+              </div>
+              <p class="step-desc" id="desc-comparison">Synthesizing thematic agreements, contradictions, and stated limitations...</p>
+              <div class="step-details hidden" id="details-comparison"></div>
+            </div>
+          </div>
+
+          <div class="timeline-step" id="step-synthesis">
+            <div class="step-marker"><span class="step-icon">5</span></div>
+            <div class="step-content">
+              <div class="step-head">
+                <h4>Synthesis (Writer) Agent</h4>
+                <span class="step-badge" id="badge-synthesis">Pending</span>
+              </div>
+              <p class="step-desc" id="desc-synthesis">Drafting cited Markdown summary and enforcing strict citation markers...</p>
+              <div class="step-details hidden" id="details-synthesis"></div>
+            </div>
+          </div>
+
+          <div class="timeline-step" id="step-evaluator">
+            <div class="step-marker"><span class="step-icon">6</span></div>
+            <div class="step-content">
+              <div class="step-head">
+                <h4>Evaluator Agent</h4>
+                <span class="step-badge" id="badge-evaluator">Pending</span>
+              </div>
+              <p class="step-desc" id="desc-evaluator">Auditing citation validity, quote verification, and LLM judge faithfulness...</p>
+              <div class="step-details hidden" id="details-evaluator"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Collapsible Raw Execution Trace -->
+        <details class="trace-details">
+          <summary class="trace-summary">View Real-Time Agent Event Log</summary>
+          <div class="trace-log-box" id="trace-events-list">
+            <div class="trace-empty">Waiting for initial agent events...</div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- View 3: Report & Evidence View -->
+    <section id="view-report" class="view hidden">
+      <div class="report-actions-bar">
+        <button id="btn-back-home" class="btn btn-secondary">← New Research</button>
+        <div class="action-buttons">
+          <button id="btn-copy-md" class="btn btn-secondary">Copy Markdown</button>
+          <button id="btn-download-md" class="btn btn-primary">Download .md</button>
+        </div>
+      </div>
+
+      <!-- Evaluation Score Card -->
+      <div class="card card-eval-summary">
+        <div class="eval-grid">
+          <div class="eval-metric">
+            <div class="metric-label">Citation Coverage</div>
+            <div class="metric-val text-accent" id="rep-cov-val">--%</div>
+            <div class="metric-sub">Factual sentences ending in valid citations</div>
+          </div>
+          <div class="eval-metric">
+            <div class="metric-label">Quote Verification</div>
+            <div class="metric-val text-success" id="rep-quote-val">--%</div>
+            <div class="metric-sub">Claims backed by verbatim chunk quotes</div>
+          </div>
+          <div class="eval-metric">
+            <div class="metric-label">Faithfulness Score</div>
+            <div class="metric-val text-accent" id="rep-faith-val">--</div>
+            <div class="metric-sub">LLM judge score (Supported + 0.5×Partial)</div>
+          </div>
+          <div class="eval-metric">
+            <div class="metric-label">Faithfulness Verdicts</div>
+            <div class="verdict-breakdown">
+              <span class="badge badge-success" id="rep-supp-badge">--% Supp</span>
+              <span class="badge badge-warning" id="rep-part-badge">--% Part</span>
+              <span class="badge badge-error" id="rep-unsupp-badge">--% Unsupp</span>
+            </div>
+            <div class="metric-sub">Distribution over cited statements</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Report Body -->
+      <article class="card card-report">
+        <div id="report-markdown-container" class="markdown-body"></div>
+      </article>
+
+      <!-- Tabs for Claims & Comparison Tables -->
+      <div class="report-subsections">
+        <div class="subsection-tabs">
+          <button class="sub-tab active" data-subtab="claims">Verified Claims & Evidence (<span id="claims-count-badge">0</span>)</button>
+          <button class="sub-tab" data-subtab="comparison">Critical Thematic Comparison</button>
+          <button class="sub-tab" data-subtab="telemetry">Execution Telemetry & Trace</button>
+        </div>
+
+        <div id="subtab-content-claims" class="subtab-pane active">
+          <div class="table-wrapper">
+            <table class="data-table" id="claims-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Claim</th>
+                  <th>Paper</th>
+                  <th>Verbatim Quote</th>
+                  <th>Stance</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="claims-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="subtab-content-comparison" class="subtab-pane hidden">
+          <div class="comparison-container" id="comparison-display"></div>
+        </div>
+
+        <div id="subtab-content-telemetry" class="subtab-pane hidden">
+          <div class="telemetry-box" id="telemetry-display"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 4: System Evaluation Page -->
+    <section id="view-eval" class="view hidden">
+      <div class="hero">
+        <h2 class="hero-title">System Retrieval & Factual Consistency Evaluation</h2>
+        <p class="hero-subtitle">
+          Rigorous benchmarking comparing <strong>Vector-Only vs. Hybrid (Vector + BM25)</strong> retrieval, quote verification, and factual consistency across curated machine learning topics.
+        </p>
+      </div>
+
+      <div class="card card-eval-results" id="eval-page-content">
+        <div class="loading-state">
+          <span class="spinner"></span> Loading latest benchmark evaluation...
+        </div>
+      </div>
+    </section>
+
+    <!-- View 5: Recent Runs History -->
+    <section id="view-history" class="view hidden">
+      <div class="hero">
+        <h2 class="hero-title">Recent Research Runs</h2>
+        <p class="hero-subtitle">History of executed multi-agent research jobs.</p>
+      </div>
+      <div class="card card-history">
+        <div class="runs-list" id="recent-runs-list">
+          <div class="loading-state">
+            <span class="spinner"></span> Loading run history...
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <div class="footer-inner">
+      <span>ResearchOS — Autonomous Multi-Agent Research System</span>
+      <span class="footer-sep">•</span>
+      <span>LangGraph • FastAPI • Qdrant Cloud • Neon Postgres • Gemini</span>
+    </div>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
