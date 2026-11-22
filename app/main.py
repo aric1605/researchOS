@@ -11,6 +11,7 @@ from app import __version__
 from app.config import settings
 from app.db.connection import check_postgres_health, run_migrations, close_db_pool
 from app.clients.vectorstore import check_qdrant_health
+from app.api.routes import router as api_router, ensure_worker_started
 
 # Configure root logger
 logging.basicConfig(
@@ -23,6 +24,8 @@ logger = logging.getLogger("researchos")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Starting ResearchOS v{__version__}...")
+    # Initialize background worker loop
+    ensure_worker_started()
     # Run database migrations if DATABASE_URL is configured
     try:
         await run_migrations()
@@ -48,6 +51,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include API endpoints
+app.include_router(api_router)
 
 
 @app.get("/health", tags=["System"])

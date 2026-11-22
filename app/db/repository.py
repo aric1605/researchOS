@@ -77,11 +77,11 @@ class Repository:
         summary_md: Optional[str] = None,
         reference_list: Optional[List[Dict[str, Any]]] = None,
         claims: Optional[List[Dict[str, Any]]] = None,
-        comparison: Optional[Dict[str, Any]]] = None,
-        eval_scores: Optional[Dict[str, Any]]] = None,
+        comparison: Optional[Dict[str, Any]] = None,
+        eval_scores: Optional[Dict[str, Any]] = None,
         trace: Optional[List[Dict[str, Any]]] = None,
-        timings: Optional[Dict[str, Any]]] = None,
-        call_counts: Optional[Dict[str, Any]]] = None,
+        timings: Optional[Dict[str, Any]] = None,
+        call_counts: Optional[Dict[str, Any]] = None,
         error_message: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         now = datetime.now(timezone.utc)
