@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: researchos
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: LLM_MODEL
+        value: gemini-2.5-flash
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: EMBEDDING_MODEL
+        value: text-embedding-004
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: QDRANT_COLLECTION
+        value: researchos_papers
+      - key: DATABASE_URL
+        sync: false
+      - key: ACCESS_CODE
+        sync: false
+      - key: MAX_LLM_CALLS_PER_RUN
+        value: "25"
+      - key: BASE_URL
+        sync: false
+      - key: PORT
+        value: "10000"
