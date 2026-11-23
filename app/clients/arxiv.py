@@ -20,7 +20,7 @@ logger = logging.getLogger("researchos.arxiv")
 
 _last_request_time = 0.0
 _rate_limit_lock = asyncio.Lock()
-MIN_REQUEST_INTERVAL = 3.0  # arXiv policy: max 1 request every 3s
+MIN_REQUEST_INTERVAL = 4.0  # arXiv policy: max 1 request every 3s (4s for safety)
 
 
 def _clean_paper_id(raw_id: str) -> str:
@@ -38,6 +38,26 @@ def _clean_paper_id(raw_id: str) -> str:
 def _clean_text(text: str) -> str:
     """Normalizes whitespace in abstracts and titles."""
     return re.sub(r"\s+", " ", text or "").strip()
+
+
+def _sanitize_arxiv_query(query: str) -> str:
+    """Sanitizes raw query into 2-3 clean keywords to prevent arXiv API timeouts and 429s."""
+    stopwords = {
+        "what", "is", "the", "foundational", "architecture", "of", "and", "how",
+        "does", "replace", "in", "on", "for", "with", "by", "at", "to", "from",
+        "about", "why", "when", "where", "which", "whose", "whom", "you", "need",
+        "all", "are", "an", "as", "be", "this", "that", "these", "those"
+    }
+    words = [w for w in re.findall(r"[a-zA-Z0-9\-]+", query) if len(w) > 1]
+    filtered = list(dict.fromkeys([w for w in words if w.lower() not in stopwords]))
+    if not filtered:
+        filtered = words[:3]
+    return " ".join(filtered[:3])
+
+
+ARXIV_HEADERS = {
+    "User-Agent": "ResearchOS/1.0 (scientific-research-agent; team@researchos.internal)"
+}
 
 
 class ArxivClient:
@@ -63,7 +83,7 @@ class ArxivClient:
         start: int = 0,
         sort_by: str = "relevance",
     ) -> List[Dict[str, Any]]:
-        """Searches arXiv API with disk caching and rate limiting."""
+        """Searches arXiv API with disk caching, rate limiting, and 429 retry backoff."""
         cache_key = {
             "query": query,
             "max_results": max_results,
@@ -75,8 +95,7 @@ class ArxivClient:
             logger.debug(f"arXiv cache hit for query: '{query}'")
             return cached
 
-        # Clean query: replace special characters
-        formatted_query = query.strip()
+        formatted_query = _sanitize_arxiv_query(query)
         url = "https://export.arxiv.org/api/query"
         params = {
             "search_query": f"all:{formatted_query}",
@@ -86,15 +105,27 @@ class ArxivClient:
             "sortOrder": "descending",
         }
 
-        await self._enforce_rate_limit()
+        data = None
+        for attempt in range(3):
+            await self._enforce_rate_limit()
+            try:
+                async with (self._client or httpx.AsyncClient(timeout=45.0, headers=ARXIV_HEADERS)) as http_client:
+                    resp = await http_client.get(url, params=params)
+                    if resp.status_code == 429:
+                        wait_time = 10.0 * (attempt + 1)
+                        logger.warning(f"arXiv 429 encountered on '{formatted_query}' (attempt {attempt+1}/3). Waiting {wait_time}s...")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    resp.raise_for_status()
+                    data = xmltodict.parse(resp.text)
+                    break
+            except Exception as e:
+                logger.warning(f"arXiv query attempt {attempt+1} failed: {e}")
+                if attempt == 2:
+                    return []
+                await asyncio.sleep(4.0)
 
-        try:
-            async with (self._client or httpx.AsyncClient(timeout=15.0)) as http_client:
-                resp = await http_client.get(url, params=params)
-                resp.raise_for_status()
-                data = xmltodict.parse(resp.text)
-        except Exception as e:
-            logger.error(f"Failed to query arXiv for '{query}': {e}")
+        if not data:
             return []
 
         feed = data.get("feed", {})
@@ -142,6 +173,53 @@ class ArxivClient:
         arxiv_cache.set(cache_key, papers)
         return papers
 
+    async def get_paper_by_id(self, paper_id: str) -> Optional[Dict[str, Any]]:
+        """Fetches paper metadata for a specific arXiv ID with caching."""
+        cache_key = {"paper_id_fetch": paper_id}
+        cached = arxiv_cache.get(cache_key)
+        if cached is not None and isinstance(cached, dict):
+            return cached
+
+        clean_id = _clean_paper_id(paper_id)
+        url = "https://export.arxiv.org/api/query"
+        params = {"id_list": clean_id}
+
+        await self._enforce_rate_limit()
+        try:
+            async with (self._client or httpx.AsyncClient(timeout=45.0, headers=ARXIV_HEADERS)) as http_client:
+                resp = await http_client.get(url, params=params)
+                resp.raise_for_status()
+                data = xmltodict.parse(resp.text)
+                feed = data.get("feed", {})
+                entry = feed.get("entry")
+                if not entry:
+                    return None
+                if isinstance(entry, list):
+                    entry = entry[0]
+
+                authors_data = entry.get("author", [])
+                if isinstance(authors_data, dict):
+                    authors_data = [authors_data]
+                authors = [a.get("name", "") for a in authors_data if isinstance(a, dict) and "name" in a]
+                published = entry.get("published", "")
+                year = int(published[:4]) if len(published) >= 4 and published[:4].isdigit() else 2024
+
+                p = {
+                    "paper_id": clean_id,
+                    "title": _clean_text(entry.get("title", "")),
+                    "summary": _clean_text(entry.get("summary", "")),
+                    "authors": authors,
+                    "year": year,
+                    "published": published,
+                    "arxiv_url": f"https://arxiv.org/abs/{clean_id}",
+                    "pdf_url": f"https://arxiv.org/pdf/{clean_id}.pdf",
+                }
+                arxiv_cache.set(cache_key, p)
+                return p
+        except Exception as e:
+            logger.warning(f"Failed to fetch paper by id {paper_id}: {e}")
+            return None
+
     async def fetch_pdf_text(self, paper_id: str, max_pages: int = 6) -> str:
         """Downloads and extracts text from first max_pages of paper PDF.
         Capped to prevent memory exhaustion on small instances.
@@ -159,7 +237,7 @@ class ArxivClient:
         try:
             if not local_pdf_path.exists():
                 await self._enforce_rate_limit()
-                async with (self._client or httpx.AsyncClient(timeout=20.0, follow_redirects=True)) as http_client:
+                async with (self._client or httpx.AsyncClient(timeout=20.0, follow_redirects=True, headers=ARXIV_HEADERS)) as http_client:
                     resp = await http_client.get(url)
                     resp.raise_for_status()
                     local_pdf_path.write_bytes(resp.content)

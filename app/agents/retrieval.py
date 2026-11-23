@@ -48,7 +48,8 @@ class RetrievalAgent:
         prompt = (
             f"Given this research sub-question:\n\"{sub_question}\"\n\n"
             f"Generate 2 specific, keyword-dense search queries suitable for arXiv title and abstract search. "
-            f"Do not use Boolean operators like AND/OR; use key scientific terms."
+            f"Keep each query concise (2 to 4 keywords only, e.g. 'transformer self-attention architecture'). "
+            f"Do not write full sentences or use Boolean operators like AND/OR."
         )
         try:
             plan = await self.llm.generate_structured(

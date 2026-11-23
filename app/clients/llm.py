@@ -130,10 +130,10 @@ class LLMClient:
         prompt: str,
         system_instruction: Optional[str] = None,
         temperature: float = 0.2,
-        max_retries: int = 3,
+        max_retries: int = 4,
     ) -> str:
         """Executes LLM call with exponential backoff on 429/transient errors."""
-        delay = 2.0
+        delay = 6.0
         last_error = None
 
         for attempt in range(max_retries):
@@ -149,8 +149,8 @@ class LLMClient:
             except Exception as e:
                 err_str = str(e).lower()
                 last_error = e
-                # Check for rate limit (429) or temporary server errors
-                if any(x in err_str for x in ["429", "resource_exhausted", "rate_limit", "quota", "503"]):
+                # Check for rate limit (429) or temporary server errors (503 / UNAVAILABLE)
+                if any(x in err_str for x in ["429", "resource_exhausted", "rate_limit", "quota", "503", "unavailable"]):
                     logger.warning(
                         f"Rate limit or 503 encountered (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {delay}s..."
                     )

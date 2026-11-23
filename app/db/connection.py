@@ -1,11 +1,20 @@
 """Database connection management and migrations for PostgreSQL (Neon)."""
 
 import os
+import sys
 import time
 import logging
+import asyncio
 from typing import Optional, Dict, Any
 from pathlib import Path
 from contextlib import asynccontextmanager
+
+if sys.platform == "win32":
+    # psycopg 3 async on Windows requires SelectorEventLoop
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    except Exception:
+        pass
 
 import psycopg
 from psycopg.rows import dict_row
@@ -103,7 +112,7 @@ async def check_postgres_health() -> Dict[str, Any]:
 
     start_time = time.time()
     try:
-        async with await psycopg.AsyncConnection.connect(conn_str, timeout=5.0) as conn:
+        async with await psycopg.AsyncConnection.connect(conn_str, connect_timeout=5) as conn:
             async with conn.cursor() as cur:
                 await cur.execute("SELECT 1 AS alive;")
                 row = await cur.fetchone()

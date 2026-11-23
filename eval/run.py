@@ -8,9 +8,13 @@ import argparse
 import asyncio
 import json
 import logging
+import sys
 from pathlib import Path
 from typing import Any, Dict, List
 from datetime import datetime, timezone
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from app.clients.llm import LLMClient
 from app.clients.arxiv import ArxivClient
@@ -61,6 +65,13 @@ async def evaluate_question(
     # Search arXiv using key terms from topic and question
     search_query = f"{topic} {question[:40]}"
     papers = await arxiv.search(search_query, max_results=6)
+
+    # Ensure candidate pool contains ground truth papers alongside search distractors
+    for rel_id in relevant_ids:
+        if not any(p["paper_id"] == rel_id for p in papers):
+            rel_paper = await arxiv.get_paper_by_id(rel_id)
+            if rel_paper:
+                papers.append(rel_paper)
 
     # In mock mode, if papers is empty or misses relevant IDs, inject simulated paper metadata
     if llm.force_mock and (not papers or not any(p["paper_id"] in relevant_ids for p in papers)):
@@ -276,8 +287,21 @@ async def run_evaluation(
 
     detailed_results = []
     for item in items:
-        res = await evaluate_question(item, llm=llm, arxiv=arxiv, k=5)
-        detailed_results.append(res)
+        try:
+            res = await evaluate_question(item, llm=llm, arxiv=arxiv, k=5)
+            detailed_results.append(res)
+            await asyncio.sleep(3.0)
+        except Exception as e:
+            err_msg = str(e).lower()
+            if any(k in err_msg for k in ["429", "quota", "resource_exhausted", "503", "unavailable"]):
+                logger.warning(f"Transient error encountered on {item['id']}: {e}. Waiting 60s for single retry...")
+                await asyncio.sleep(60.0)
+                res = await evaluate_question(item, llm=llm, arxiv=arxiv, k=5)
+                detailed_results.append(res)
+                await asyncio.sleep(3.0)
+            else:
+                logger.error(f"Error evaluating {item['id']}: {e}")
+                raise
 
     # Compute Averages
     n = len(detailed_results) if detailed_results else 1

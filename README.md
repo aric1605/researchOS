@@ -93,31 +93,35 @@ ResearchOS addresses AI hallucination through a three-layer verification pipelin
 
 ## 📊 Evaluation Results & Benchmark Ablation
 
-Evaluated across **8 curated academic research queries** on foundational machine learning topics (*Transformers, RAG, LoRA, FlashAttention, Chain-of-Thought, Switch Transformers, Diffusion Models, DPO*):
+> **Evaluation Scope**: Small real run, **3 questions completed** on live hosted services (Google Gemini `gemini-3.5-flash-lite`, Gemini `gemini-embedding-001` 768-dim vectors, Qdrant Cloud cluster, Neon PostgreSQL, and arXiv API).  
+> **Evaluated Topics**: Transformers (`1706.03762`), Retrieval-Augmented Generation (`2005.11401`), and LoRA Parameter-Efficient Fine-Tuning (`2106.09685`).
 
 ### 1. Retrieval Quality: Vector-Only vs. Hybrid (Vector + BM25) Ablation ($k=5$)
 
+Comparison of candidate document retrieval against known ground-truth arXiv relevant papers (cutoff $k=5$):
+
 | Metric | Vector-Only | Hybrid (Dense + BM25 RRF) | Absolute Delta | Relative Gain |
 | :--- | :---: | :---: | :---: | :---: |
-| **Precision@5** | `0.1750` | **`0.2000`** | `+0.0250` | **+14.3%** |
-| **Recall@5** | `0.8750` | **`1.0000`** | `+0.1250` | **+14.3%** |
-| **MRR** | `0.5000` | **`0.4938`** | `-0.0062` | -1.2% |
-| **nDCG@5** | `0.5982` | **`0.6215`** | `+0.0233` | **+3.9%** |
+| **Precision@5** | `0.2000` | **`0.2000`** | `+0.0000` | `+0.0%` |
+| **Recall@5** | `1.0000` | **`1.0000`** | `+0.0000` | `+0.0%` |
+| **MRR** | `1.0000` | **`1.0000`** | `+0.0000` | `+0.0%` |
+| **nDCG@5** | `1.0000` | **`1.0000`** | `+0.0000` | `+0.0%` |
 
 ### 2. Factual Consistency & Hallucination Metrics
 
-| Dimension | Measured Score | Evaluation Mechanism |
-| :--- | :---: | :--- |
-| **Citation Coverage** | **`83.3%`** | Programmatic regex & sentence segmentation |
-| **Quote-Verification Rate** | **`100.0%`** (real) / programmatic | Strict verbatim chunk substring matching |
-| **Faithfulness Score** | **`0.917`** | Batched LLM judge score (`SUPPORTED` + 0.5×`PARTIAL`) |
-| **Verdict: SUPPORTED** | **`85.0%`** | Direct alignment with cited paper excerpt |
-| **Verdict: PARTIAL** | **`13.3%`** | Minor synthesis generalization / paraphrasing |
-| **Verdict: UNSUPPORTED** | **`1.7%`** | Conflicting or unbacked assertion |
+| Dimension | Measured Score | Evaluation Mechanism | System Defense |
+| :--- | :---: | :--- | :--- |
+| **Citation Coverage** | **`24.8%`** | Programmatic regex & sentence parser | Flags and filters uncited factual assertions |
+| **Quote-Verification Rate** | **`100.0%`** | Strict verbatim chunk substring matching | Drops claim immediately if quote is not verbatim in chunk text |
+| **Faithfulness Score** | **`1.000`** | Batched LLM judge score | Evaluates each cited sentence against evidence |
+| **Verdict: SUPPORTED** | **`100.0%`** | LLM Judge | Direct claim-evidence alignment |
+| **Verdict: PARTIAL** | **`0.0%`** | LLM Judge | Minor synthesis generalization / paraphrasing |
+| **Verdict: UNSUPPORTED** | **`0.0%`** | LLM Judge | Unsupported or conflicting assertion |
 
-### 3. Honest Limitations & Threats to Validity
-- **Hand-Curated Benchmark Scale**: The evaluation dataset currently contains 8 focused computer science topics. Evaluation on larger, cross-disciplinary corpora (e.g., PubMed, bioRxiv) is needed for broad generalization.
-- **LLM Judge Inherent Bias**: Evaluating synthetic text using an LLM judge carries potential alignment bias. Programmatic verbatim quote checks serve as an impartial first line of defense.
+### 3. Known Limitations & Threats to Validity
+- **Small Real Sample Size**: This evaluation was executed on a small real run of **3 completed questions** (out of 8 in `dataset.jsonl`) due to upstream LLM API rate limits (15 RPM on Google Gemini free tier). While verifying full real-service operation, findings should be evaluated as an initial benchmark rather than an exhaustive multi-hundred query study.
+- **Retrieval Saturation on Small Sets**: On this 3-question sample where ground-truth papers have prominent titles and abstracts, both dense cosine search and BM25 placed the ground-truth paper at rank 1 (MRR=1.0000). On larger corpus retrieval with distractors that share vocabulary, hybrid fusion provides greater differentiation.
+- **LLM Judge Alignment Bias**: Evaluating synthetic text using an LLM judge carries potential alignment bias. Programmatic verbatim quote checks serve as an impartial, zero-bias first line of defense.
 - **PDF Size Cap**: Parsing is capped at the first 6 pages to avoid OOM errors on free 512 MB hosting tiers. Extended appendices or late methodology sections rely on paper abstracts.
 
 ---

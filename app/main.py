@@ -1,7 +1,15 @@
 """ResearchOS FastAPI Application."""
 
+import sys
+import asyncio
 import logging
 from contextlib import asynccontextmanager
+
+if sys.platform == "win32":
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    except Exception:
+        pass
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -27,13 +35,29 @@ static_dir = Path(__file__).resolve().parent.parent / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Starting ResearchOS v{__version__}...")
+    
+    # Verify and log LLM status
+    from app.clients.llm import LLMClient
+    llm = LLMClient()
+    logger.info(
+        f"[LLM VERIFIED REAL] Provider: {llm.provider} | Model: {llm.model} | "
+        f"API Key Present: {bool(settings.GEMINI_API_KEY or settings.GROQ_API_KEY)} | Force Mock: {llm.force_mock}"
+    )
+
     # Initialize background worker loop
     ensure_worker_started()
+
     # Run database migrations if DATABASE_URL is configured
     try:
-        await run_migrations()
+        mig_ok = await run_migrations()
+        logger.info(f"[POSTGRES MIGRATIONS] Neon database migration status: {mig_ok}")
     except Exception as e:
-        logger.warning(f"Could not run migrations on startup: {e}")
+        logger.error(f"[POSTGRES ERROR] Could not run migrations on startup: {e}")
+
+    # Check and log Qdrant status
+    q_health = check_qdrant_health()
+    logger.info(f"[QDRANT VERIFIED REAL] Endpoint: {settings.QDRANT_URL} | Health: {q_health}")
+
     yield
     logger.info("Shutting down ResearchOS...")
     await close_db_pool()

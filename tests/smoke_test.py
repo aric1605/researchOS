@@ -2,13 +2,22 @@
 Runs a complete research job and asserts report generation, citations, and evaluation scores.
 """
 
+import sys
+import os
 import asyncio
 import json
 import logging
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+sys.path.insert(0, os.getcwd())
+
 from app.graph.state import ResearchState
 from app.graph.build import build_research_graph
 from app.clients.llm import LLMClient
 from app.config import settings
+from app.db.repository import Repository
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -19,11 +28,14 @@ async def main():
     print(f"Research Question: {question}")
     print(f"Provider: {settings.LLM_PROVIDER} | Model: {settings.LLM_MODEL}")
 
+    run_id = f"smoke_test_{int(asyncio.get_event_loop().time())}"
+    await Repository.create_run(run_id=run_id, question=question, depth="standard", max_papers=3)
+
     llm = LLMClient()
     graph = build_research_graph(llm_client=llm)
 
     state = ResearchState(
-        run_id="smoke_test_run",
+        run_id=run_id,
         question=question,
         depth="standard",
         max_papers=3,

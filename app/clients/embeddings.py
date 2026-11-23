@@ -62,27 +62,28 @@ async def get_embeddings(
             results[idx] = emb
         return [r for r in results if r is not None]
 
-    # Real call via google-genai SDK
+    # Real call via google-genai SDK with batching (up to 25 texts per call)
     try:
         from google import genai
         client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        for idx in missing_indices:
-            text = texts[idx]
+        batch_size = 25
+        for i in range(0, len(missing_indices), batch_size):
+            batch_indices = missing_indices[i : i + batch_size]
+            batch_texts = [texts[idx] for idx in batch_indices]
             resp = await client.aio.models.embed_content(
                 model=target_model,
-                contents=text,
+                contents=batch_texts,
+                config={"output_dimensionality": EMBEDDING_DIM},
             )
-            # Response contains embedding.values
-            if hasattr(resp, "embedding") and hasattr(resp.embedding, "values"):
-                emb = list(resp.embedding.values)
-            elif hasattr(resp, "embeddings") and len(resp.embeddings) > 0:
-                emb = list(resp.embeddings[0].values)
-            else:
-                logger.warning("Unexpected embed_content response structure; falling back to mock.")
-                emb = _get_mock_embedding(text, dim=EMBEDDING_DIM)
+            raw_embs = []
+            if hasattr(resp, "embeddings") and resp.embeddings:
+                raw_embs = [list(e.values) for e in resp.embeddings]
+            elif hasattr(resp, "embedding") and hasattr(resp.embedding, "values"):
+                raw_embs = [list(resp.embedding.values)]
 
-            embedding_cache.set({"text": text, "model": target_model}, emb)
-            results[idx] = emb
+            for b_idx, emb in zip(batch_indices, raw_embs):
+                embedding_cache.set({"text": texts[b_idx], "model": target_model}, emb)
+                results[b_idx] = emb
     except Exception as e:
         logger.error(f"Error calling Gemini Embedding API: {e}. Falling back to mock embeddings.")
         for idx in missing_indices:
